@@ -6,7 +6,6 @@ import (
 	"net/http"
 	"os"
 
-	"github.com/gin-contrib/cors"
 	"github.com/gin-gonic/gin"
 	_ "github.com/go-sql-driver/mysql"
 )
@@ -15,7 +14,7 @@ import (
 // 1. ESTRUCTURAS ORIGINALES
 // ==========================================
 
-// Estructura para LEER reportes (GET) - (¡Recuperada!)
+// Estructura para LEER reportes (GET)
 type Reporte struct {
 	ID          int     `json:"id_reportes"`
 	Titulo      string  `json:"titulo"`
@@ -89,9 +88,7 @@ type UsuarioAdmin struct {
 // ==========================================
 
 func main() {
-	// 1. Conexión a la BD
-	// 1. Conexión a la BD en la Nube (Aiven) con la contraseña actualizada
-	// 1. Conexión a la BD en la Nube (Aiven) con verificación saltada
+	// 1. Conexión a la BD en la Nube (Aiven)
 	dsn := "avnadmin:AVNS_z1CZB540pqCrdxWXGYB@tcp(ecoradar-bd-ricardoruiz-3eaf.k.aivencloud.com:27416)/defaultdb?parseTime=true&tls=skip-verify"
 	db, err := sql.Open("mysql", dsn)
 	if err != nil {
@@ -107,7 +104,20 @@ func main() {
 	os.MkdirAll("uploads", os.ModePerm)
 
 	r := gin.Default()
-	r.Use(cors.Default())
+
+	// --- MAGIA DE CORS (PASAPORTE UNIVERSAL) ---
+	r.Use(func(c *gin.Context) {
+		c.Writer.Header().Set("Access-Control-Allow-Origin", "*")
+		c.Writer.Header().Set("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS")
+		c.Writer.Header().Set("Access-Control-Allow-Headers", "Origin, Content-Type, Authorization")
+
+		if c.Request.Method == "OPTIONS" {
+			c.AbortWithStatus(204)
+			return
+		}
+		c.Next()
+	})
+	// -------------------------------------------
 
 	// 3. Exponer la carpeta de fotos
 	r.Static("/uploads", "./uploads")
@@ -145,7 +155,6 @@ func main() {
 	})
 
 	// RUTA POST: Crear un nuevo reporte desde la App del Ciudadano
-	// RUTA POST: Crear un nuevo reporte desde la App del Ciudadano
 	r.POST("/api/reportes", func(c *gin.Context) {
 		titulo := c.PostForm("titulo")
 		descripcion := c.PostForm("descripcion")
@@ -163,7 +172,7 @@ func main() {
 			c.SaveUploadedFile(foto, "uploads/"+nombreArchivo)
 		}
 
-		// Insertar en MySQL (ahora incluimos la columna 'fotografia')
+		// Insertar en MySQL
 		query := `
 			INSERT INTO tbreportes (titulo, descripcion, latitud, longitud, id_categorias, id_usuario, estado, fotografia)
 			VALUES (?, ?, ?, ?, ?, ?, 'Pendiente', ?)
@@ -178,7 +187,8 @@ func main() {
 
 		c.JSON(http.StatusOK, gin.H{"mensaje": "Reporte creado con éxito"})
 	})
-	// RUTA PUT: Actualizar el estado (¡Bug de sintaxis corregido!)
+
+	// RUTA PUT: Actualizar el estado
 	r.PUT("/api/reportes/:id/estado", func(c *gin.Context) {
 		id := c.Param("id")
 		var datos EstadoUpdate
@@ -187,7 +197,6 @@ func main() {
 			return
 		}
 		query := "UPDATE tbreportes SET estado = ? WHERE id_reportes = ?"
-		// Corrección aquí: faltaban los dos puntos :=
 		_, err := db.Exec(query, datos.NuevoEstado, id)
 		if err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
@@ -302,6 +311,6 @@ func main() {
 		c.JSON(http.StatusOK, lista)
 	})
 
-	log.Println("✅ Servidor corriendo de forma exitosa en http://localhost:8080")
+	log.Println("✅ Servidor corriendo de forma exitosa en https://ecoradar-api.onrender.com")
 	r.Run(":8080")
 }
