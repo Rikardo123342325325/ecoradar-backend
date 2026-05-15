@@ -25,6 +25,7 @@ type Reporte struct {
 	Estado      string  `json:"estado"`
 	Fotografia  string  `json:"fotografia"`
 	Categoria   string  `json:"categoria"`
+	Fecha       string  `json:"fecha"`
 }
 
 // Estructura para CREAR reportes (POST)
@@ -155,7 +156,8 @@ func main() {
 	r.GET("/api/reportes", func(c *gin.Context) {
 		query := `
 			SELECT r.id_reportes, r.titulo, r.descripcion, r.latitud, r.longitud, 
-				   IFNULL(r.estado, 'Pendiente'), IFNULL(r.fotografia, ''), IFNULL(cat.nombre_categorias, 'General')
+				   IFNULL(r.estado, 'Pendiente'), IFNULL(r.fotografia, ''), IFNULL(cat.nombre_categorias, 'General'),
+				   IFNULL(r.fecha_creacion, NOW()) -- <--- ESTO ES LO NUEVO
 			FROM tbreportes r
 			LEFT JOIN tbcategorias cat ON r.id_categorias = cat.id_categorias
 		`
@@ -169,7 +171,8 @@ func main() {
 		var reportes []Reporte
 		for rows.Next() {
 			var rep Reporte
-			if err := rows.Scan(&rep.ID, &rep.Titulo, &rep.Descripcion, &rep.Latitud, &rep.Longitud, &rep.Estado, &rep.Fotografia, &rep.Categoria); err != nil {
+			// Agrégale &rep.Fecha justo antes del paréntesis de cierre:
+			if err := rows.Scan(&rep.ID, &rep.Titulo, &rep.Descripcion, &rep.Latitud, &rep.Longitud, &rep.Estado, &rep.Fotografia, &rep.Categoria, &rep.Fecha); err != nil {
 				log.Println("Error leyendo fila:", err)
 				continue
 			}
@@ -198,8 +201,8 @@ func main() {
 
 		// Insertar en MySQL
 		query := `
-			INSERT INTO tbreportes (titulo, descripcion, latitud, longitud, id_categorias, id_usuario, estado, fotografia)
-			VALUES (?, ?, ?, ?, ?, ?, 'Pendiente', ?)
+			INSERT INTO tbreportes (titulo, descripcion, latitud, longitud, id_categorias, id_usuario, estado, fotografia, fecha_creacion)
+			VALUES (?, ?, ?, ?, ?, ?, 'Pendiente', ?, NOW())
 		`
 
 		_, err := db.Exec(query, titulo, descripcion, latitud, longitud, idCategorias, idUsuario, nombreArchivo)
