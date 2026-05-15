@@ -1,7 +1,9 @@
 package main
 
 import (
+	"bytes"
 	"database/sql"
+	"encoding/json"
 	"log"
 	"net/http"
 	"os"
@@ -347,4 +349,46 @@ func main() {
 		port = "8080"
 	}
 	r.Run(":" + port)
+
+	// RUTA DE IA: Generar análisis inteligente
+	r.POST("/api/ia/analisis", func(c *gin.Context) {
+		var data []Reporte // Recibimos la lista de reportes actuales
+		if err := c.ShouldBindJSON(&data); err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "Datos inválidos"})
+			return
+		}
+
+		// Convertimos los reportes a un texto simple para que la IA los lea
+		contexto := "Analiza estos reportes ciudadanos de Villahermosa y dime: 1. Patrón detectado. 2. Zona más crítica. 3. Una recomendación estratégica:\n"
+		for _, r := range data {
+			contexto += "- " + r.Categoria + ": " + r.Descripcion + " en " + r.Titulo + "\n"
+		}
+
+		// Configuración de la petición a Google Gemini
+		apiKey := "AIzaSyDKTv6k6rq6-U0eSOIGG45D6s7SX6gt3S0" // <--- PEGA TU CLAVE AQUÍ
+		urlIA := "https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=" + apiKey
+
+		payload := map[string]interface{}{
+			"contents": []map[string]interface{}{
+				{
+					"parts": []map[string]string{
+						{"text": contexto},
+					},
+				},
+			},
+		}
+
+		jsonPayload, _ := json.Marshal(payload)
+		resp, err := http.Post(urlIA, "application/json", bytes.NewBuffer(jsonPayload))
+
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Error al conectar con la IA"})
+			return
+		}
+		defer resp.Body.Close()
+
+		var result map[string]interface{}
+		json.NewDecoder(resp.Body).Decode(&result)
+		c.JSON(http.StatusOK, result)
+	})
 }
