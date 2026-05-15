@@ -339,17 +339,6 @@ func main() {
 		}
 		c.JSON(http.StatusOK, lista)
 	})
-
-	log.Println("✅ Servidor corriendo de forma exitosa en https://ecoradar-api.onrender.com")
-
-	// Si Render.com pasa un puerto (ej. process.env.PORT), es recomendable leerlo.
-	// Por ahora mantengo el 8080 que tenías originalmente.
-	port := os.Getenv("PORT")
-	if port == "" {
-		port = "8080"
-	}
-	r.Run(":" + port)
-
 	// RUTA DE IA: Generar análisis inteligente
 	r.POST("/api/ia/analisis", func(c *gin.Context) {
 		var data []Reporte // Recibimos la lista de reportes actuales
@@ -391,4 +380,15 @@ func main() {
 		json.NewDecoder(resp.Body).Decode(&result)
 		c.JSON(http.StatusOK, result)
 	})
+
+	log.Println("✅ Servidor corriendo de forma exitosa en https://ecoradar-api.onrender.com")
+
+	// Si Render.com pasa un puerto (ej. process.env.PORT), es recomendable leerlo.
+	// Por ahora mantengo el 8080 que tenías originalmente.
+	port := os.Getenv("PORT")
+	if port == "" {
+		port = "8080"
+	}
+	r.Run(":" + port)
+
 }
