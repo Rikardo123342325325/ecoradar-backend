@@ -355,7 +355,7 @@ func main() {
 
 		// Configuración de la petición a Google Gemini
 		apiKey := "AIzaSyDKTv6k6rq6-U0eSOIGG45D6s7SX6gt3S0" // <--- PEGA TU CLAVE AQUÍ
-		urlIA := "https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash-latest:generateContent?key=" + apiKey + apiKey
+		urlIA := "https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash-latest:generateContent?key=" + apiKey
 
 		payload := map[string]interface{}{
 			"contents": []map[string]interface{}{
