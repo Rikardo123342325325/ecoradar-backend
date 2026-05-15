@@ -5,6 +5,7 @@ import (
 	"log"
 	"net/http"
 	"os"
+	"time" // Importamos time para configurar la duración de las conexiones
 
 	"github.com/gin-gonic/gin"
 	_ "github.com/go-sql-driver/mysql"
@@ -94,11 +95,34 @@ func main() {
 	if err != nil {
 		log.Fatal(err)
 	}
+	// Nos aseguramos de cerrar la BD al apagar el servidor
 	defer db.Close()
 
 	if err := db.Ping(); err != nil {
 		log.Fatal("Error conectando a la BD:", err)
 	}
+
+	// =========================================================================
+	// ✨ MAGIA PARA EVITAR QUE AIVEN CIERRE LA CONEXIÓN (POOL DE CONEXIONES)
+	// =========================================================================
+
+	// SetConnMaxLifetime establece la cantidad máxima de tiempo que una conexión puede ser reutilizada.
+	// Aiven suele cerrar las inactivas a los 5 minutos. Si le decimos a Go que las recicle cada 1 minuto,
+	// evitamos el error "invalid connection" o "connection reset by peer".
+	db.SetConnMaxLifetime(time.Minute * 1)
+
+	// SetMaxOpenConns establece el número máximo de conexiones abiertas a la base de datos.
+	// Ayuda a no saturar los límites de tu plan gratuito en Aiven.
+	db.SetMaxOpenConns(10)
+
+	// SetMaxIdleConns establece el número máximo de conexiones inactivas en el pool.
+	// Mantiene conexiones "calientes" para que la API responda rápido sin reconectar siempre.
+	db.SetMaxIdleConns(10)
+
+	// SetConnMaxIdleTime cierra las conexiones que llevan mucho tiempo sin hacer nada.
+	db.SetConnMaxIdleTime(time.Minute * 1)
+
+	// =========================================================================
 
 	// 2. Crear la carpeta "uploads" si no existe para guardar las fotos ahí
 	os.MkdirAll("uploads", os.ModePerm)
@@ -124,7 +148,7 @@ func main() {
 
 	// RUTA GET: Verificar estado
 	r.GET("/api/status", func(c *gin.Context) {
-		c.JSON(http.StatusOK, gin.H{"mensaje": "API en línea"})
+		c.JSON(http.StatusOK, gin.H{"mensaje": "API en línea y BD conectada establemente"})
 	})
 
 	// RUTA GET: Obtener todos los reportes con su Categoría
@@ -168,7 +192,7 @@ func main() {
 		nombreArchivo := ""
 		if errFoto == nil {
 			nombreArchivo = foto.Filename
-			// Guardamos el archivo físicamente en la carpeta "uploads" de tu PC
+			// Guardamos el archivo físicamente en la carpeta "uploads" de tu PC / Servidor
 			c.SaveUploadedFile(foto, "uploads/"+nombreArchivo)
 		}
 
@@ -312,5 +336,12 @@ func main() {
 	})
 
 	log.Println("✅ Servidor corriendo de forma exitosa en https://ecoradar-api.onrender.com")
-	r.Run(":8080")
+
+	// Si Render.com pasa un puerto (ej. process.env.PORT), es recomendable leerlo.
+	// Por ahora mantengo el 8080 que tenías originalmente.
+	port := os.Getenv("PORT")
+	if port == "" {
+		port = "8080"
+	}
+	r.Run(":" + port)
 }
