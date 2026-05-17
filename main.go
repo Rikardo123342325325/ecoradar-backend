@@ -219,7 +219,9 @@ func main() {
 			}
 			ctx := context.Background()
 
-			resp, errUpload := cld.Upload.Upload(ctx, openedFile, uploader.UploadParams{PublicID: formFile.Filename})
+			resp, errUpload := cld.Upload.Upload(ctx, openedFile, uploader.UploadParams{
+				Folder: "ecoradar",
+			})
 			if errUpload != nil {
 				log.Println("❌ Error al subir a Cloudinary:", errUpload)
 				c.JSON(http.StatusInternalServerError, gin.H{"error": "Falló la subida de imagen a la nube"})
