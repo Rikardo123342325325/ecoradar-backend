@@ -8,6 +8,7 @@ import (
 	"log"
 	"net/http"
 	"os"
+	"strconv"
 	"time"
 
 	"github.com/cloudinary/cloudinary-go/v2"
@@ -189,60 +190,60 @@ func main() {
 	// RUTA POST: Crear un nuevo reporte (Subiendo la foto a Cloudinary)
 	r.POST("/api/reportes", func(c *gin.Context) {
 		// Recibimos los datos del formulario (FormData)
-		idUsuario := c.PostForm("id_usuario")
-		idCategorias := c.PostForm("id_categorias")
+		// Convertimos a los tipos correctos para evitar errores en MySQL
+		idUsuario, _ := strconv.Atoi(c.PostForm("id_usuario"))
+		idCategorias, _ := strconv.Atoi(c.PostForm("id_categorias"))
 		titulo := c.PostForm("titulo")
 		descripcion := c.PostForm("descripcion")
-		latitud := c.PostForm("latitud")
-		longitud := c.PostForm("longitud")
+		latitud, _ := strconv.ParseFloat(c.PostForm("latitud"), 64)
+		longitud, _ := strconv.ParseFloat(c.PostForm("longitud"), 64)
 
-		// --- MAGIA NUEVA: SUBIR A CLOUDINARY ---
-		// 1. Obtener la foto del formulario
+		// --- FOTO: OPCIONAL ---
+		// Si viene foto la subimos a Cloudinary, si no, guardamos cadena vacía
+		urlFoto := ""
 		formFile, errFoto := c.FormFile("fotografia")
-		if errFoto != nil {
-			c.JSON(http.StatusBadRequest, gin.H{"error": "Falta la fotografía obligatoria"})
-			return
+		if errFoto == nil {
+			// Hay foto — abrirla y subirla a Cloudinary
+			openedFile, errOpen := formFile.Open()
+			if errOpen != nil {
+				c.JSON(http.StatusInternalServerError, gin.H{"error": "Error al leer el archivo"})
+				return
+			}
+			defer openedFile.Close()
+
+			cld, errCld := cloudinary.NewFromURL(os.Getenv("CLOUDINARY_URL"))
+			if errCld != nil {
+				log.Println("❌ Error al conectar con Cloudinary:", errCld)
+				c.JSON(http.StatusInternalServerError, gin.H{"error": "Error de configuración de Cloudinary"})
+				return
+			}
+			ctx := context.Background()
+
+			resp, errUpload := cld.Upload.Upload(ctx, openedFile, uploader.UploadParams{PublicID: formFile.Filename})
+			if errUpload != nil {
+				log.Println("❌ Error al subir a Cloudinary:", errUpload)
+				c.JSON(http.StatusInternalServerError, gin.H{"error": "Falló la subida de imagen a la nube"})
+				return
+			}
+			urlFoto = resp.SecureURL
+			log.Println("✅ Foto subida exitosamente a:", urlFoto)
+		} else {
+			log.Println("ℹ️ Reporte sin fotografía, se guarda sin imagen.")
 		}
 
-		// 2. Abrir el archivo que recibimos en memoria
-		openedFile, errOpen := formFile.Open()
-		if errOpen != nil {
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "Error al leer el archivo"})
-			return
-		}
-		defer openedFile.Close()
-
-		// 3. Conectarnos a Cloudinary usando la variable de entorno que pusimos en Render
-		cld, _ := cloudinary.NewFromURL(os.Getenv("CLOUDINARY_URL"))
-		ctx := context.Background()
-
-		// 4. Subir la foto a la nube
-		// Le asignamos el nombre original del archivo pero Cloudinary lo hará seguro.
-		resp, errUpload := cld.Upload.Upload(ctx, openedFile, uploader.UploadParams{PublicID: formFile.Filename})
-		if errUpload != nil {
-			log.Println("❌ Error al subir a Cloudinary:", errUpload)
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "Falló la subida de imagen a la nube"})
-			return
-		}
-
-		// La URL segura e inmortal que nos dio Cloudinary es:
-		urlInmortal := resp.SecureURL
-		log.Println("✅ Foto subida exitosamente a:", urlInmortal)
-
-		// --- INSERTAR EN BD (Guardando la URL, no el nombre local) ---
+		// --- INSERTAR EN BD ---
 		query := `
-        INSERT INTO tbreportes (id_usuario, id_categorias, titulo, descripcion, latitud, longitud, fotografia, estado, fecha_creacion)
-        VALUES (?, ?, ?, ?, ?, ?, ?, 'Pendiente', NOW())
-    `
-
-		_, err := db.Exec(query, idUsuario, idCategorias, titulo, descripcion, latitud, longitud, urlInmortal)
+			INSERT INTO tbreportes (id_usuario, id_categorias, titulo, descripcion, latitud, longitud, fotografia, estado, fecha_creacion)
+			VALUES (?, ?, ?, ?, ?, ?, ?, 'Pendiente', NOW())
+		`
+		_, err := db.Exec(query, idUsuario, idCategorias, titulo, descripcion, latitud, longitud, urlFoto)
 		if err != nil {
 			log.Println("❌ Error al guardar en MySQL:", err)
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "No se pudo guardar el reporte en la base de datos"})
 			return
 		}
 
-		c.JSON(http.StatusOK, gin.H{"mensaje": "Reporte creado exitosamente", "foto_url": urlInmortal})
+		c.JSON(http.StatusOK, gin.H{"mensaje": "Reporte creado exitosamente", "foto_url": urlFoto})
 	})
 
 	// RUTA PUT: Actualizar el estado
@@ -286,9 +287,10 @@ func main() {
 		}
 
 		c.JSON(http.StatusOK, gin.H{
-			"mensaje": "Login exitoso",
-			"token":   "eco_token_valido_xyz123",
-			"usuario": nombre,
+			"mensaje":    "Login exitoso",
+			"token":      "eco_token_valido_xyz123",
+			"usuario":    nombre,
+			"id_usuario": id,
 		})
 	})
 
