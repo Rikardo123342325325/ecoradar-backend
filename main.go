@@ -228,7 +228,10 @@ func main() {
 				return
 			}
 			urlFoto = resp.SecureURL
-			log.Println("✅ Foto subida exitosamente a:", urlFoto)
+			if urlFoto == "" {
+				urlFoto = resp.URL
+			}
+			log.Printf("✅ Foto subida. SecureURL: '%s' | URL: '%s' | PublicID: '%s'", resp.SecureURL, resp.URL, resp.PublicID)
 		} else {
 			log.Println("ℹ️ Reporte sin fotografía, se guarda sin imagen.")
 		}
