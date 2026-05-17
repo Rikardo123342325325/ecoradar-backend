@@ -157,6 +157,17 @@ func main() {
 	r.GET("/api/status", func(c *gin.Context) {
 		c.JSON(http.StatusOK, gin.H{"mensaje": "API en línea y BD conectada establemente"})
 	})
+	// RUTA DELETE: Eliminar reporte permanentemente (depuración de spam)
+	r.DELETE("/api/reportes/:id", func(c *gin.Context) {
+		id := c.Param("id")
+		_, err := db.Exec("DELETE FROM tbreportes WHERE id_reportes = ?", id)
+		if err != nil {
+			log.Println("❌ Error al eliminar reporte:", err)
+			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+			return
+		}
+		c.JSON(http.StatusOK, gin.H{"mensaje": "Reporte eliminado permanentemente"})
+	})
 
 	// RUTA GET: Obtener todos los reportes con su Categoría
 	r.GET("/api/reportes", func(c *gin.Context) {
