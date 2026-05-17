@@ -211,7 +211,11 @@ func main() {
 			}
 			defer openedFile.Close()
 
-			cld, errCld := cloudinary.NewFromURL(os.Getenv("CLOUDINARY_URL"))
+			cld, errCld := cloudinary.NewFromParams(
+				os.Getenv("CLOUDINARY_CLOUD_NAME"),
+				os.Getenv("CLOUDINARY_API_KEY"),
+				os.Getenv("CLOUDINARY_API_SECRET"),
+			)
 			if errCld != nil {
 				log.Println("❌ Error al conectar con Cloudinary:", errCld)
 				c.JSON(http.StatusInternalServerError, gin.H{"error": "Error de configuración de Cloudinary"})
